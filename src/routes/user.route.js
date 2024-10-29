@@ -17,3 +17,5 @@ router.route("/register").post(
   ]),
   registerUser
 );
+
+export { router as userRouter };
