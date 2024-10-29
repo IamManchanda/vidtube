@@ -19,19 +19,35 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 
   const avatarLocalPath =
-    req.files && req.files.avatar[0] ? req.files.avatar[0].path : null;
+    req.files && req.files.avatar && req.files.avatar[0]
+      ? req.files.avatar[0].path
+      : null;
   const coverImageLocalPath =
-    req.files && req.files.coverImage[0] ? req.files.coverImage[0].path : null;
+    req.files && req.files.coverImage && req.files.coverImage[0]
+      ? req.files.coverImage[0].path
+      : null;
 
   if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar file is missing");
   }
 
-  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  let avatar = "";
+
+  try {
+    avatar = await uploadOnCloudinary(avatarLocalPath);
+    console.log("Avatar uploaded to Cloudinary:", avatar.url);
+  } catch (error) {
+    throw new ApiError(500, "Something went wrong while uploading avatar");
+  }
 
   let coverImage = "";
-  if (coverImageLocalPath) {
-    coverImage = await uploadOnCloudinary(coverImageLocalPath);
+  try {
+    if (coverImageLocalPath) {
+      coverImage = await uploadOnCloudinary(coverImageLocalPath);
+      console.log("Cover image uploaded to Cloudinary:", coverImage.url);
+    }
+  } catch (error) {
+    throw new ApiError(500, "Something went wrong while uploading cover image");
   }
 
   const user = await User.create({
