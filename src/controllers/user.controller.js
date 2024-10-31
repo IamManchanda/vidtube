@@ -3,7 +3,10 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { validateTrimmedFields } from "../utils/validate.js";
 import { User } from "../models/user.model.js";
-import { uploadOnCloudinary } from "../utils/cloudinary.js";
+import {
+  uploadOnCloudinary,
+  deleteFromCloudinary,
+} from "../utils/cloudinary.js";
 
 const registerUser = asyncHandler(async (req, res) => {
   const { fullName, username, email, password } = req.body;
@@ -35,7 +38,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
   try {
     avatar = await uploadOnCloudinary(avatarLocalPath);
-    console.log("Avatar uploaded to Cloudinary:", avatar.url);
+    console.log("Avatar uploaded to Cloudinary:", avatar.secure_url);
   } catch (error) {
     throw new ApiError(500, "Something went wrong while uploading avatar");
   }
@@ -44,32 +47,49 @@ const registerUser = asyncHandler(async (req, res) => {
   try {
     if (coverImageLocalPath) {
       coverImage = await uploadOnCloudinary(coverImageLocalPath);
-      console.log("Cover image uploaded to Cloudinary:", coverImage.url);
+      console.log("Cover image uploaded to Cloudinary:", coverImage.secure_url);
     }
   } catch (error) {
     throw new ApiError(500, "Something went wrong while uploading cover image");
   }
 
-  const user = await User.create({
-    fullName,
-    email,
-    username: username.toLowerCase(),
-    password,
-    avatar: avatar.url,
-    coverImage: coverImage ? coverImage.url : "",
-  });
+  try {
+    const user = await User.create({
+      fullName,
+      email,
+      username: username.toLowerCase(),
+      password,
+      avatar: avatar.secure_url,
+      coverImage: coverImage ? coverImage.secure_url : "",
+    });
 
-  const createdUser = await User.findById(user._id).select(
-    "-password -refreshToken"
-  );
+    const createdUser = await User.findById(user._id).select(
+      "-password -refreshToken"
+    );
 
-  if (!createdUser) {
-    throw new ApiError(500, "Something went wrong while registering user");
+    if (!createdUser) {
+      throw new ApiError(500, "Something went wrong while registering user");
+    }
+
+    return res
+      .status(201)
+      .json(new ApiResponse(201, "User registered successfully", createdUser));
+  } catch (error) {
+    console.log("user creation failed:", error);
+
+    if (avatar) {
+      await deleteFromCloudinary(avatar.public_id);
+    }
+
+    if (coverImage) {
+      await deleteFromCloudinary(coverImage.public_id);
+    }
+
+    throw new ApiError(
+      500,
+      "Something went wrong while registering user and images were deleted"
+    );
   }
-
-  return res
-    .status(201)
-    .json(new ApiResponse(201, "User registered successfully", createdUser));
 });
 
 export { registerUser };
